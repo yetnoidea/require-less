@@ -42,10 +42,10 @@ define(['require'], function(require) {
   }
 
   lessAPI.load = function(lessId, req, load, config) {
-    window.less = config.less || {};
+    window.less = (config.config || {}).less || {};
     window.less.env = 'development';
 
-    require(['./lessc', './normalize'], function(lessc, normalize) {
+    require(['./lessc', './normalize', './optimize'], function(lessc, normalize, optimize) {
 
       var fileUrl = req.toUrl(lessId + '.less');
       fileUrl = normalize.absoluteURI(fileUrl, pagePath);
@@ -53,14 +53,18 @@ define(['require'], function(require) {
       var parser = new lessc.Parser(window.less);
 
       parser.parse('@import (multiple) "' + fileUrl + '";', function(err, tree) {
-        if (err)
-          return load.error(err);
+        if (err) return load.error(err);
 
-        lessAPI.inject(normalize(tree.toCSS(config.less), fileUrl, pagePath));
+        var lessed = tree.toCSS(config.less);
 
-        setTimeout(load, 7);
-      }, window.less);
+        optimize(window.less.plugins, lessed, function (err, optimized) {
+          if (err) return load.error(err);
 
+          lessAPI.inject(normalize(optimized, fileUrl, pagePath));
+
+          setTimeout(load, 7);
+        }, window.less);
+      });
     });
   }
   
